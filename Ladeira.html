@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+
+<style>
+    :root {
+        --bg: #0b1020;
+        --lane: #111827;
+        --card: #161923;
+        --accent: #ff3b3b;
+        --text: #e6eef8;
+    }
+
+    html, body {
+        height: 100%;
+        margin: 0;
+        font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial;
+    }
+
+    body {
+        background: linear-gradient(180deg, var(--bg), #ff3b3b);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text);
+    }
+
+    .wrap {
+        width: min(980px, 96vw);
+        background: #ff3b3b;
+        padding: 18px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(2, 6, 23, 0.6);
+    }
+
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    h1 {
+        font-size: 18px;
+        margin: 0;
+    }
+
+    .btn {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+        padding: 8px 10px;
+        border-radius: 8px;
+        color: #e6eef8;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn:hover {
+        background: rgba(255,255,255,0.07);
+    }
+
+    .btn:active {
+        transform: translateY(1px);
+    }
+
+    canvas {
+        display: block;
+        width: 100%;
+        border-radius: 8px;
+        background: linear-gradient(180deg,#0a1220,#071025);
+        touch-action: none;
+    }
+
+    .controls {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .note {
+        font-size: 13px;
+        opacity: 0.8;
+    }
+
+    .overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(2,6,23,0.6);
+        z-index: 9999;
+    }
+
+    .overlay.open {
+        display: flex;
+    }
+
+    .modal {
+        background: #081220;
+        padding: 18px;
+        border-radius: 10px;
+        max-width: 420px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(2,6,23,0.7);
+    }
+
+    .modal h2 {margin: 0 0 8px;}
+    .modal button {margin-top: 12px; width: 100%;}
+</style>
+</head>
+<body>
+    <div class="wrap" role="application">
+        <header>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <button class="btn" href="jogos.html" >⟵ Voltar</button>
+                <h1>Runner — Desviar de Obstáculos</h1>
+            </div>
+            <div>Pontuação: <span id="score">0</span></div>
+        </header>
+
+        <canvas id="game" width="760" height="426"></canvas>
+
+        <div class="controls">
+            <div style="display:flex;gap:8px;">
+                <button class="btn" id="leftBtn"></button>
+                <button class="btn" id="upBtn"></button>
+                <button class="btn" id="rightBtn"></button>
+            </div>
+            <button class="btn" id="startBtn">Iniciar</button>
+        </div>
+
+        <div class="note">Use as setas para mover e pular. No celular, deslize ou toque.</div>
+    </div>
+
+    <div id="gameOver" class="overlay" role="dialog" aria-modal="true">
+        <div class="modal">
+            <h2>Você perdeu!</h2>
+            <p>Pontuação: <strong id="finalScore">0</strong></p>
+            <button class="btn" id="restartBtn">Jogar novamente</button>
+        </div>
+    </div>
+
+<script>
+/* ====== Runner Game ====== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = canvas.width;
+let H = canvas.height;
+const lanes = 3;
+const laneWidth = W / (lanes + 1);
+const lanePositions = [];
+for (let i = 0; i < lanes; i++) lanePositions.push((i + 1) * laneWidth);
+
+const player = {
+  lane: 1, x: lanePositions[1], y: H - 90, width: 40, height: 60,
+  color: '#4fe3a1', targetX: lanePositions[1], vy: 0,
+  isJumping: false, jumpSpeed: -12, gravity: 0.6, groundY: H - 90
+};
+let obstacles = [], spawnTimer = 0, spawnInterval = 90, speed = 4;
+let running = false, frame = 0, score = 0;
+
+const scoreEl = document.getElementById('score');
+const startBtn = document.getElementById('startBtn');
+const leftBtn = document.getElementById('leftBtn');
+const rightBtn = document.getElementById('rightBtn');
+const upBtn = document.getElementById('upBtn');
+const gameOverOverlay = document.getElementById('gameOver');
+const finalScoreEl = document.getElementById('finalScore');
+const restartBtn = document.getElementById('restartBtn');
+
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function spawnObstacle(){
+  const lane = randInt(0, lanes - 1);
+  const width = randInt(28, 60);
+  const height = randInt(28, 60);
+  const x = lanePositions[lane] - width/2;
+  const y = -height - 10;
+  obstacles.push({ lane, x, y, width, height, color: '#ff8b6b' });
+}
+function reset(){
+  obstacles = [];
+  spawnTimer = 0; spawnInterval = 90; speed = 4; frame = 0; score = 0;
+  player.lane = 1; player.x = lanePositions[1]; player.targetX = lanePositions[1];
+  player.y = player.groundY; player.vy = 0; player.isJumping = false;
+  running = true; gameOverOverlay.classList.remove('open');
+  startBtn.textContent = 'Pausar';
+}
+function gameOver(){
+  running = false;
+  finalScoreEl.textContent = Math.floor(score);
+  gameOverOverlay.classList.add('open');
+  startBtn.textContent = 'Iniciar';
+}
+function moveLeft(){ if(!running) return; player.lane = Math.max(0, player.lane - 1); player.targetX = lanePositions[player.lane]; }
+function moveRight(){ if(!running) return; player.lane = Math.min(lanes-1, player.lane + 1); player.targetX = lanePositions[player.lane]; }
+function jump(){ if(!running) return; if(!player.isJumping){ player.vy = player.jumpSpeed; player.isJumping = true; } }
+function rectsOverlap(a,b){ return !(a.x + a.width < b.x || a.x > b.x + b.width || a.y + a.height < b.y || a.y > b.y + b.height); }
+
+function update(){
+  if(!running) return;
+  frame++; score += 0.12; scoreEl.textContent = Math.floor(score);
+  if(frame % 1200 === 0 && spawnInterval > 30){ spawnInterval -= 6; speed += 0.4; }
+  spawnTimer++;
+  if(spawnTimer >= spawnInterval){ spawnTimer = 0; spawnObstacle(); }
+  for(let i = obstacles.length - 1; i >= 0; i--){
+    const ob = obstacles[i];
+    ob.y += speed;
+    const playerBox = {x: player.x - player.width/2, y: player.y, width: player.width, height: player.height};
+    const obBox = {x: ob.x, y: ob.y, width: ob.width, height: ob.height};
+    if(rectsOverlap(playerBox, obBox)){ if(!(player.isJumping && (player.y + player.height) < (ob.y + 10))){ gameOver(); } }
+    if(ob.y > H + 100) obstacles.splice(i,1);
+  }
+  if(player.isJumping){
+    player.vy += player.gravity;
+    player.y += player.vy;
+    if(player.y >= player.groundY){ player.y = player.groundY; player.vy = 0; player.isJumping = false; }
+  }
+  const dx = player.targetX - player.x; player.x += dx * 0.2;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#081827'; ctx.fillRect(0,0,W,H);
+  const laneTop = 40, laneBottom = H - 20;
+  for(let i=0;i<lanes;i++){
+    const cx = lanePositions[i];
+    ctx.fillStyle = '#0f2533';
+    ctx.fillRect(cx - laneWidth/2 + 8, laneTop, laneWidth - 16, laneBottom - laneTop);
+    ctx.fillStyle = '#0c4158';
+    ctx.fillRect(cx - 2, laneTop + 12, 4, laneBottom - laneTop - 24);
+  }
+  obstacles.forEach(ob => {
+    ctx.fillStyle = ob.color;
+    ctx.fillRect(ob.x - 4, ob.y + 6, ob.width + 8, ob.height + 6);
+    ctx.fillStyle = ob.color;
+    ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+  });
+  const px = player.x, py = player.y;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(px, player.groundY + player.height - 6, player.width * 0.6, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = player.color; ctx.fillRect(px - player.width/2, py, player.width, player.height);
+  ctx.fillStyle = '#083028'; ctx.fillRect(px - 8, py + 10, 16, 10);
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.strokeRect(px - player.width/2, py, player.width, player.height);
+}
+
+function loop(){ update(); draw(); if(running) requestAnimationFrame(loop); }
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') moveLeft();
+  if(e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') moveRight();
+  if(e.key === 'ArrowUp' || e.code === 'Space') jump();
+  if(e.key.toLowerCase() === 'p') { running = !running; if(running) requestAnimationFrame(loop); }
+});
+leftBtn.onclick = moveLeft; rightBtn.onclick = moveRight; upBtn.onclick = jump;
+startBtn.onclick = ()=>{ if(!running){ reset(); requestAnimationFrame(loop); } else { running = false; startBtn.textContent='Iniciar'; } };
+restartBtn.onclick = ()=>{ reset(); requestAnimationFrame(loop); };
+
+reset(); running = false; startBtn.textContent = 'Iniciar';
+</script>
+</body>
+</html>

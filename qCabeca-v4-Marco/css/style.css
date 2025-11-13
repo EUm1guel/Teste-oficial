@@ -19,7 +19,7 @@
 
 #paginaInicial {
   text-align: center;
-  background-color: #7f16cf;
+  background-color: #ff0000;
   padding: 0vh 0;
   
   position: fixed; /* Fixes the header relative to the viewport */
@@ -35,7 +35,7 @@
   height: 7vh;
   font-size: 25px;
   margin-top: 5vh;
-  background-color: rgb(69, 0, 87);
+  background-color: #FFC108;
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -48,7 +48,7 @@
   height: 7vh;
   font-size: 25px;
   margin-top: 5vh;
-  background-color: rgb(69, 0, 87);
+  background-color: #FFC108;
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -99,7 +99,7 @@
 
 
 body {
-  color: rgb(69, 0, 87);
+  color: #000000;
   font-family: "Bebas Neue", sans-serif;
   text-align: center;
   font-size: 3vw;
@@ -212,6 +212,12 @@ footer{
 #footer{
   padding-top: 2vh;
 }
-h2{
-  padding-top: 15vh;
+h2 {
+  padding-top: 5vh;
+}
+
+.rank-option{
+  margin: 5px 0;
+  line-height: 3vh;
+  font-size: 30px;
 }
