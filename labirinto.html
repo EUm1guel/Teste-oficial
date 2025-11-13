@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jogo de Labirinto - Vários Níveis</title>
+  <style>
+    :root{--bg:#0b1020;--wall:#dbe2e8;--floor:#0f1724;--player:#ffcc00;--goal:#34d399}
+    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    body{background:linear-gradient(180deg,var(--bg),#071022);display:flex;align-items:center;justify-content:center;color:#e6eef8}
+    .wrap{width:min(980px,96vw);max-width:980px;background:rgba(255,255,255,0.03);padding:18px;border-radius:12px;box-shadow:0 8px 24px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    h1{font-size:18px;margin:0}
+    #mazeCanvas{display:block;background:linear-gradient(180deg,#071226,#0b1320);border-radius:8px}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:10px}
+    .btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;color:#e6eef8;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .hint{font-size:13px;opacity:0.9}
+    .touch-controls{display:none;margin-top:10px;gap:8px}
+    .touch-row{display:flex;gap:8px}
+    .touch-btn{width:56px;height:56px;border-radius:10px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-weight:700}
+    @media (max-width:700px){.touch-controls{display:flex;flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Jogo de Labirinto — Vários Níveis</h1>
+      <div class="hint">Use setas / WASD ou toque para mover. Complete todos os níveis!</div>
+    </header>
+
+    <canvas id="mazeCanvas" width="800" height="560"></canvas>
+
+    <div class="controls">
+      <button class="btn" id="resetBtn">Resetar</button>
+      <button class="btn" id="nextBtn">Próximo Nível</button>
+      <button class="btn" id="showGridBtn">Mostrar/Ocultar Grade</button>
+      <div style="flex:1"></div>
+      <div class="hint">Nível: <span id="levelInfo">1</span></div>
+    </div>
+
+    <div class="touch-controls" id="touch"> 
+      <div class="touch-row" style="justify-content:center"><div class="touch-btn" data-dir="up">▲</div></div>
+      <div class="touch-row" style="justify-content:center"><div class="touch-btn" data-dir="left">◀</div><div style="width:16px"></div><div class="touch-btn" data-dir="right">▶</div></div>
+      <div class="touch-row" style="justify-content:center"><div class="touch-btn" data-dir="down">▼</div></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('mazeCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const levels = [
+      [ // Nível 1
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
+        [1,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,0,1,0,1,1,0,1,0,1],
+        [1,0,1,0,1,0,0,0,1,0,0,1,0,1,0,1],
+        [1,0,1,0,1,0,1,1,1,1,0,1,0,1,0,1],
+        [1,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1],
+        [1,1,1,0,1,1,1,1,0,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ],
+      [ // Nível 2
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1],
+        [1,0,1,0,1,0,1,1,1,0,1,0,1,1,0,1],
+        [1,0,1,0,0,0,0,0,1,0,0,0,1,0,0,1],
+        [1,0,1,1,1,1,1,0,1,1,1,0,1,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1],
+        [1,1,1,1,1,0,1,1,1,0,1,1,1,1,0,1],
+        [1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,1],
+        [1,0,1,0,1,1,1,0,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ]
+    ];
+
+    let currentLevel = 0;
+    let maze = JSON.parse(JSON.stringify(levels[currentLevel]));
+
+    const cols = maze[0].length;
+    const rows = maze.length;
+    const tileSize = Math.floor(Math.min(canvas.width / cols, canvas.height / rows));
+    canvas.width = tileSize * cols;
+    canvas.height = tileSize * rows;
+
+    const player = {x:1, y:1, size: tileSize * 0.6};
+    const goal = {x: cols-2, y: rows-2};
+
+    let showGrid = false;
+
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          const x = c * tileSize;
+          const y = r * tileSize;
+          ctx.fillStyle = maze[r][c] === 1 ? getComputedStyle(document.documentElement).getPropertyValue('--wall') : getComputedStyle(document.documentElement).getPropertyValue('--floor');
+          ctx.fillRect(x,y,tileSize,tileSize);
+        }
+      }
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--goal');
+      ctx.fillRect(goal.xtileSize + tileSize0.18, goal.ytileSize + tileSize0.18, tileSize0.64, tileSize0.64);
+      if(showGrid){
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        for(let r=0;r<=rows;r++){ctx.beginPath();ctx.moveTo(0,rtileSize);ctx.lineTo(colstileSize,r*tileSize);ctx.stroke();}
+        for(let c=0;c<=cols;c++){ctx.beginPath();ctx.moveTo(ctileSize,0);ctx.lineTo(ctileSize,rows*tileSize);ctx.stroke();}
+      }
+      const px = player.x * tileSize + (tileSize - player.size)/2;
+      const py = player.y * tileSize + (tileSize - player.size)/2;
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--player');
+      ctx.beginPath(); ctx.arc(px+player.size/2,py+player.size/2,player.size/2,0,Math.PI*2); ctx.fill();
+      if(player.x===goal.x&&player.y===goal.y){
+        ctx.fillStyle='rgba(255,255,255,0.07)';ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle='#fff';ctx.font='22px system-ui';ctx.textAlign='center';
+        ctx.fillText('Você venceu o nível '+(currentLevel+1)+'! 🎉',canvas.width/2,canvas.height/2);
+      }
+    }
+
+    function canMoveTo(x,y){return maze[y]&&maze[y][x]===0;}
+    function move(dx,dy){if(canMoveTo(player.x+dx,player.y+dy)){player.x+=dx;player.y+=dy;draw();}}
+
+    window.addEventListener('keydown',e=>{
+      if(['ArrowUp','KeyW'].includes(e.code)) move(0,-1);
+      else if(['ArrowDown','KeyS'].includes(e.code)) move(0,1);
+      else if(['ArrowLeft','KeyA'].includes(e.code)) move(-1,0);
+      else if(['ArrowRight','KeyD'].includes(e.code)) move(1,0);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click',()=>{player.x=1;player.y=1;draw();});
+    document.getElementById('showGridBtn').addEventListener('click',()=>{showGrid=!showGrid;draw();});
+    document.getElementById('nextBtn').addEventListener('click',()=>{
+      currentLevel=(currentLevel+1)%levels.length;
+      maze=JSON.parse(JSON.stringify(levels[currentLevel]));
+      player.x=1;player.y=1;document.getElementById('levelInfo').textContent=currentLevel+1;draw();
+    });
+
+    document.querySelectorAll('.touch-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const dir=btn.getAttribute('data-dir');
+        if(dir==='up') move(0,-1);
+        if(dir==='down') move(0,1);
+        if(dir==='left') move(-1,0);
+        if(dir==='right') move(1,0);
+      });
+    });
+
+    draw();
+  </script>
+</body>
+</html>
